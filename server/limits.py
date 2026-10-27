@@ -24,7 +24,7 @@ class ParamRange:
         return value
 
 
-# 最大 RPS: 10〜500 を 10 刻み（50 段階）。最大 RPS の 15KB で約 61Mbps となり、注入の上限 60Mbps に届く
+# 最大リクエスト/秒: 10〜500 を 10 刻み（50 段階）。最大リクエスト/秒の 15KB で約 61Mbps となり、注入の上限 60Mbps に届く
 RPS_RANGE = ParamRange(minimum=10, maximum=500, step=10, default=500)
 
 # 最大接続数: 1〜100 を 1 刻み。100 接続あれば帯域上限まで届き、グラフの変化も読み取りやすい

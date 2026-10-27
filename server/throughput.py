@@ -25,7 +25,7 @@ class _Event:
 
 
 class ThroughputMeter:
-    """直近 window_sec 秒の受信から、種別ごとの Mbps と RPS を出す"""
+    """直近 window_sec 秒の受信から、種別ごとの Mbps とリクエスト/秒を出す"""
 
     def __init__(
         self,
@@ -44,7 +44,7 @@ class ThroughputMeter:
         self._prune()
 
     def snapshot(self) -> dict:
-        """直近の時間窓での Mbps と RPS。合計は全種別の和"""
+        """直近の時間窓での Mbps とリクエスト/秒。合計は全種別の和"""
         self._prune()
         byte_totals = {kind: 0 for kind in (*KINDS, OTHER_KIND)}
         request_totals = {kind: 0 for kind in (*KINDS, OTHER_KIND)}

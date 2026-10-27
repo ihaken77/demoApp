@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 BASELINE_MBPS = 20
 BASELINE_CHUNK_BYTES = 256 * 1024
 
-# 負荷の 1 リクエストのサイズ。15KB × 最大 RPS 500 ≈ 61Mbps で、注入の上限 60Mbps に届く
+# 負荷の 1 リクエストのサイズ。15KB × 最大リクエスト/秒 500 ≈ 61Mbps で、注入の上限 60Mbps に届く
 REQUEST_BYTES = 15 * 1024
 
 BASELINE_BODY = bytes(BASELINE_CHUNK_BYTES)
@@ -79,13 +79,15 @@ class TrafficRunner:
         byte_bucket = AsyncTokenBucket(
             rate=mbps_to_bytes_per_sec(MAX_INJECTED_MBPS), burst=REQUEST_BYTES
         )
-        # 1 件ずつ待つと sleep の誤差で RPS が目標より下がるため、RPS の 1/50 件ずつまとめて渡す
+        # 1 件ずつ待つと sleep の誤差でリクエスト数が目標より下がるため、リクエスト/秒の 1/50 件ずつまとめて渡す
         request_bucket = AsyncTokenBucket(rate=rps, burst=max(1, rps // 50))
         self._load_task = asyncio.create_task(
             self._load_supervisor(connections, request_bucket, byte_bucket)
         )
         self._load_params = (rps, connections)
-        logger.info("負荷の通信を開始しました（RPS %d / 接続数 %d）", rps, connections)
+        logger.info(
+            "負荷の通信を開始しました（リクエスト/秒 %d / 接続数 %d）", rps, connections
+        )
 
     async def aclose(self) -> None:
         if self._baseline_task is not None:
@@ -107,7 +109,7 @@ class TrafficRunner:
         request_bucket: AsyncTokenBucket,
         byte_bucket: AsyncTokenBucket,
     ) -> None:
-        # 接続数の分だけ同時に送る。RPS と帯域の上限は全員で共有する
+        # 接続数の分だけ同時に送る。リクエスト数と帯域の上限は全員で共有する
         workers = [
             asyncio.create_task(self._load_worker(request_bucket, byte_bucket))
             for _ in range(connections)

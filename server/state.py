@@ -7,7 +7,7 @@ from server.limits import CONNECTIONS_RANGE, RPS_RANGE
 
 @dataclass
 class LoadState:
-    """通常の通信と負荷の通信の ON/OFF、最大 RPS、最大接続数"""
+    """通常の通信と負荷の通信の ON/OFF、最大リクエスト/秒、最大接続数"""
 
     baseline_on: bool = False
     load_on: bool = False
