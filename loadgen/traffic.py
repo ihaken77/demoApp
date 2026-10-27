@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 BASELINE_MBPS = 20
 BASELINE_CHUNK_BYTES = 256 * 1024
 
-# 負荷の 1 リクエストのサイズ。10KB × 最大 RPS 500 ≈ 40Mbps で、注入の上限 50Mbps の内に収まる
-REQUEST_BYTES = 10 * 1024
+# 負荷の 1 リクエストのサイズ。15KB × 最大 RPS 500 ≈ 61Mbps で、注入の上限 60Mbps に届く
+REQUEST_BYTES = 15 * 1024
 
 BASELINE_BODY = bytes(BASELINE_CHUNK_BYTES)
 REQUEST_BODY = bytes(REQUEST_BYTES)

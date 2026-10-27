@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 # 注入負荷の帯域上限（コード定数。設定ファイルや引数では上げられない）
-MAX_INJECTED_MBPS = 50
+MAX_INJECTED_MBPS = 60
 
 
 @dataclass(frozen=True)
@@ -24,8 +24,8 @@ class ParamRange:
         return value
 
 
-# 最大 RPS: 10〜500 を 10 刻み（50 段階）。10KB の応答で約 40Mbps となり、帯域上限 50Mbps の内に収まる
-RPS_RANGE = ParamRange(minimum=10, maximum=500, step=10, default=100)
+# 最大 RPS: 10〜500 を 10 刻み（50 段階）。最大 RPS の 15KB で約 61Mbps となり、注入の上限 60Mbps に届く
+RPS_RANGE = ParamRange(minimum=10, maximum=500, step=10, default=500)
 
 # 最大接続数: 1〜100 を 1 刻み。100 接続あれば帯域上限まで届き、グラフの変化も読み取りやすい
-CONNECTIONS_RANGE = ParamRange(minimum=1, maximum=100, step=1, default=10)
+CONNECTIONS_RANGE = ParamRange(minimum=1, maximum=100, step=1, default=100)

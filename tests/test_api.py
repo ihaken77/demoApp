@@ -39,17 +39,17 @@ def test_初期状態と上下限を返す() -> None:
     assert data["state"] == {
         "baseline_on": False,
         "load_on": False,
-        "rps": 100,
-        "connections": 10,
+        "rps": 500,
+        "connections": 100,
     }
     assert data["limits"]["rps"] == {
         "minimum": 10,
         "maximum": 500,
         "step": 10,
-        "default": 100,
+        "default": 500,
     }
     assert data["limits"]["connections"]["maximum"] == 100
-    assert data["limits"]["max_injected_mbps"] == 50
+    assert data["limits"]["max_injected_mbps"] == 60
 
 
 def test_通常の通信と負荷のON_OFFを独立して切り替える() -> None:
@@ -63,8 +63,8 @@ def test_通常の通信と負荷のON_OFFを独立して切り替える() -> No
     assert sent[-1] == {
         "baseline_on": True,
         "load_on": True,
-        "rps": 100,
-        "connections": 10,
+        "rps": 500,
+        "connections": 100,
     }
 
 
@@ -83,7 +83,7 @@ def test_範囲外の値は422で拒否し_バックエンドには送らない(
 
     assert response.status_code == 422
     assert sent == []
-    assert state["rps"] == 100
+    assert state["rps"] == 500
 
 
 def test_刻みに合わない値は422で拒否する() -> None:
