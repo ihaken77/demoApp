@@ -18,6 +18,10 @@
     .slider { display: flex; align-items: center; gap: 12px; }
     .slider input { flex: 1; }
     .value { min-width: 4em; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+    table.traffic { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+    table.traffic th, table.traffic td { padding: 6px 4px; border-bottom: 1px solid #eceef2; text-align: right; }
+    table.traffic th:first-child, table.traffic td:first-child { text-align: left; }
+    table.traffic tr.total td { font-weight: 600; }
     #error { color: #b42318; min-height: 1.2em; margin: 0; font-size: 14px; }
   </style>
 </head>
@@ -59,6 +63,23 @@
           <span id="connectionsValue" class="value"></span>
         </span>
       </label>
+    </section>
+
+    <section class="card">
+      <div>
+        <strong>実測の通信量</strong>
+        <div class="note" id="trafficNote">フロントが受信した量（直近 1 秒、HTTP の本文）</div>
+      </div>
+      <table class="traffic">
+        <thead>
+          <tr><th></th><th>Mbps</th><th>RPS</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>通常の通信</td><td id="mbpsBaseline" class="value">-</td><td id="rpsBaseline">-</td></tr>
+          <tr><td>負荷の通信</td><td id="mbpsLoad" class="value">-</td><td id="rpsLoad">-</td></tr>
+          <tr class="total"><td>合計</td><td id="mbpsTotal" class="value">-</td><td id="rpsTotal">-</td></tr>
+        </tbody>
+      </table>
     </section>
 
     <p id="error" role="alert"></p>
@@ -118,6 +139,27 @@
     $("rps").addEventListener("input", (e) => { $("rpsValue").textContent = e.target.value; });
     $("connections").addEventListener("input", (e) => { $("connectionsValue").textContent = e.target.value; });
 
+    // 実測の通信量を 1 秒ごとに取り直す。前の取得が終わってから次を予約し、要求が重ならないようにする
+    const TRAFFIC_ROWS = ["Baseline", "Load", "Total"];
+    async function pollTraffic() {
+      try {
+        const res = await fetch("/api/traffic", { cache: "no-store" });
+        const data = await res.json();
+        for (const [kind, suffix] of [["baseline", "Baseline"], ["load", "Load"], ["total", "Total"]]) {
+          $(`mbps${suffix}`).textContent = data[kind].mbps.toFixed(1);
+          $(`rps${suffix}`).textContent = data[kind].rps.toFixed(1);
+        }
+        $("trafficNote").textContent = "フロントが受信した量（直近 1 秒、HTTP の本文）";
+      } catch {
+        for (const suffix of TRAFFIC_ROWS) {
+          $(`mbps${suffix}`).textContent = "-";
+          $(`rps${suffix}`).textContent = "-";
+        }
+        $("trafficNote").textContent = "受信量を取得できません";
+      }
+      setTimeout(pollTraffic, 1000);
+    }
+
     (async () => {
       try {
         const res = await fetch("/api/state");
@@ -130,6 +172,7 @@
         $("error").textContent = "フロントのサーバに接続できません";
       }
     })();
+    pollTraffic();
   </script>
 </body>
 </html>

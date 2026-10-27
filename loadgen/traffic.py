@@ -7,6 +7,7 @@ import httpx
 
 from loadgen.pacing import AsyncTokenBucket
 from server.limits import CONNECTIONS_RANGE, MAX_INJECTED_MBPS
+from server.throughput import TRAFFIC_KIND_HEADER
 
 logger = logging.getLogger(__name__)
 
@@ -123,16 +124,19 @@ class TrafficRunner:
         while True:
             await request_bucket.acquire(1)
             await byte_bucket.acquire(REQUEST_BYTES)
-            await self._post(REQUEST_BODY)
+            await self._post(REQUEST_BODY, "load")
 
     async def _baseline_loop(self, bucket: AsyncTokenBucket) -> None:
         while True:
             await bucket.acquire(BASELINE_CHUNK_BYTES)
-            await self._post(BASELINE_BODY)
+            await self._post(BASELINE_BODY, "baseline")
 
-    async def _post(self, body: bytes) -> None:
+    async def _post(self, body: bytes, kind: str) -> None:
         try:
-            await self._client.post("/receive", content=body)
+            # 種別を付けて送る。フロントが通常の通信と負荷の通信を分けて実測できるようにする
+            await self._client.post(
+                "/receive", content=body, headers={TRAFFIC_KIND_HEADER: kind}
+            )
         except httpx.HTTPError as error:
             # 一時的な失敗では止めず、次の送信で続ける
             logger.warning("フロントへの送信に失敗しました: %s", type(error).__name__)

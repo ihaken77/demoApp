@@ -76,3 +76,22 @@ def test_フロントの受け口まで負荷が届く() -> None:
         assert apply(client, load_on=True, rps=10, connections=1).status_code == 200
         time.sleep(0.3)
         apply(client, load_on=False)
+
+
+def test_送信時に通常の通信と負荷の通信の種別を付ける() -> None:
+    kinds: list[str] = []
+
+    def record_kind(request: httpx.Request) -> httpx.Response:
+        kinds.append(request.headers["X-Traffic-Kind"])
+        return httpx.Response(204)
+
+    runner = TrafficRunner(
+        "http://receiver.test", transport=httpx.MockTransport(record_kind)
+    )
+    with TestClient(create_control_app(runner)) as client:
+        apply(client, baseline_on=True)
+        apply(client, load_on=True, rps=10, connections=1)
+        time.sleep(0.2)
+
+    assert "baseline" in kinds
+    assert "load" in kinds

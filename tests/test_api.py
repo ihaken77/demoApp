@@ -102,3 +102,19 @@ def test_バックエンドへの送信に失敗したら状態を変えない()
 
     assert response.status_code == 502
     assert state["load_on"] is False
+
+
+def test_受信した通信量を種別ごとに実測として返す() -> None:
+    with make_client() as client:
+        for _ in range(2):
+            client.post(
+                "/receive",
+                content=bytes(10 * 1024),
+                headers={"X-Traffic-Kind": "load"},
+            )
+        data = client.get("/api/traffic").json()
+
+    assert data["load"]["rps"] == 2.0
+    assert data["load"]["mbps"] > 0
+    assert data["baseline"]["mbps"] == 0.0
+    assert data["total"]["mbps"] == data["load"]["mbps"]
