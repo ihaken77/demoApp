@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>負荷制御</title>
+  <style>
+    body { margin: 0; padding: 24px 16px; font-family: system-ui, sans-serif; background: #f5f6f8; color: #1d1f23; }
+    main { max-width: 640px; margin: 0 auto; display: grid; gap: 16px; }
+    h1 { font-size: 20px; margin: 0; }
+    .card { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); display: grid; gap: 12px; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .note { color: #5b6170; font-size: 13px; }
+    button.toggle { min-width: 96px; padding: 8px 12px; border: 0; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer; }
+    button.on { background: #1f7a4d; color: #fff; }
+    button.off { background: #d9dce1; color: #1d1f23; }
+    label { display: grid; gap: 6px; font-size: 14px; }
+    .slider { display: flex; align-items: center; gap: 12px; }
+    .slider input { flex: 1; }
+    .value { min-width: 4em; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+    #error { color: #b42318; min-height: 1.2em; margin: 0; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>負荷制御 <span id="backend" class="note"></span></h1>
+
+    <section class="card">
+      <div class="row">
+        <div>
+          <strong>通常の通信</strong>
+          <div class="note">ベースライン 約 20Mbps</div>
+        </div>
+        <button id="baseline" class="toggle off" type="button">OFF</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <div>
+          <strong>負荷の通信</strong>
+          <div class="note">注入の上限 <span id="maxMbps"></span>Mbps</div>
+        </div>
+        <button id="load" class="toggle off" type="button">OFF</button>
+      </div>
+
+      <label>
+        最大 RPS
+        <span class="slider">
+          <input id="rps" type="range">
+          <span id="rpsValue" class="value"></span>
+        </span>
+      </label>
+
+      <label>
+        最大接続数
+        <span class="slider">
+          <input id="connections" type="range">
+          <span id="connectionsValue" class="value"></span>
+        </span>
+      </label>
+    </section>
+
+    <p id="error" role="alert"></p>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let state = null;
+
+    function render() {
+      for (const [id, on] of [["baseline", state.baseline_on], ["load", state.load_on]]) {
+        $(id).textContent = on ? "ON" : "OFF";
+        $(id).className = `toggle ${on ? "on" : "off"}`;
+      }
+      $("rps").value = state.rps;
+      $("rpsValue").textContent = state.rps;
+      $("connections").value = state.connections;
+      $("connectionsValue").textContent = state.connections;
+    }
+
+    async function send(body) {
+      $("error").textContent = "";
+      try {
+        const res = await fetch("/api/control", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          $("error").textContent = data.detail ?? "送信に失敗しました";
+        } else {
+          state = data.state;
+        }
+      } catch {
+        $("error").textContent = "フロントのサーバに接続できません";
+      }
+      // 送れなかった場合も、表示は最後に確定した状態へ戻す
+      render();
+    }
+
+    function setLimits(limits) {
+      for (const [id, range] of [["rps", limits.rps], ["connections", limits.connections]]) {
+        $(id).min = range.minimum;
+        $(id).max = range.maximum;
+        $(id).step = range.step;
+      }
+      $("maxMbps").textContent = limits.max_injected_mbps;
+    }
+
+    $("baseline").addEventListener("click", () => send({ baseline_on: !state.baseline_on }));
+    $("load").addEventListener("click", () => send({ load_on: !state.load_on }));
+    // 離した時点で1回だけ送る（ドラッグ中に何度も送らない）
+    $("rps").addEventListener("change", (e) => send({ rps: Number(e.target.value) }));
+    $("connections").addEventListener("change", (e) => send({ connections: Number(e.target.value) }));
+    // 表示中の値だけ先に動かす（送信結果で確定する）
+    $("rps").addEventListener("input", (e) => { $("rpsValue").textContent = e.target.value; });
+    $("connections").addEventListener("input", (e) => { $("connectionsValue").textContent = e.target.value; });
+
+    (async () => {
+      try {
+        const res = await fetch("/api/state");
+        const data = await res.json();
+        $("backend").textContent = `接続先: ${data.backend}`;
+        setLimits(data.limits);
+        state = data.state;
+        render();
+      } catch {
+        $("error").textContent = "フロントのサーバに接続できません";
+      }
+    })();
+  </script>
+</body>
+</html>
