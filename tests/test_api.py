@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from server.backend_client import BackendClient
 from server.main import create_app
+from server.throughput import LOAD_PATH
 
 # バックエンドの代わりに、受け取った指示を記録する
 sent: list[dict] = []
@@ -108,9 +109,9 @@ def test_受信した通信量を種別ごとに実測として返す() -> None:
     with make_client() as client:
         for _ in range(2):
             client.post(
-                "/receive",
+                LOAD_PATH,
                 content=bytes(10 * 1024),
-                headers={"X-Traffic-Kind": "load"},
+                headers={"Content-Type": "application/json"},
             )
         data = client.get("/api/traffic").json()
 

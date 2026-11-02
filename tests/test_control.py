@@ -7,13 +7,14 @@ from loadgen.control import create_control_app
 from loadgen.traffic import TrafficRunner
 from server.backend_client import BackendClient
 from server.main import create_app
+from server.throughput import BASELINE_PATH, LOAD_PATH
 
 received_paths: list[str] = []
 
 
 def fake_receiver(request: httpx.Request) -> httpx.Response:
     received_paths.append(request.url.path)
-    return httpx.Response(204)
+    return httpx.Response(202)
 
 
 def make_client() -> TestClient:
@@ -46,7 +47,7 @@ def test_通常の通信のON_OFFを切り替える() -> None:
         time.sleep(0.1)
         assert apply(client, baseline_on=False).json()["baseline_on"] is False
 
-    assert received_paths and set(received_paths) == {"/receive"}
+    assert received_paths and set(received_paths) == {BASELINE_PATH}
 
 
 def test_負荷の通信のON_OFFを切り替える() -> None:
@@ -78,20 +79,22 @@ def test_フロントの受け口まで負荷が届く() -> None:
         apply(client, load_on=False)
 
 
-def test_送信時に通常の通信と負荷の通信の種別を付ける() -> None:
-    kinds: list[str] = []
+def test_通常の通信と負荷の通信は別の経路に送る() -> None:
+    paths: set[str] = set()
 
-    def record_kind(request: httpx.Request) -> httpx.Response:
-        kinds.append(request.headers["X-Traffic-Kind"])
-        return httpx.Response(204)
+    def record_path(request: httpx.Request) -> httpx.Response:
+        paths.add(request.url.path)
+        # 本文は JSON として届くこと（既定の httpx の User-Agent ではないこと）も確かめる
+        assert request.headers["Content-Type"] == "application/json"
+        assert request.headers["User-Agent"].startswith("ingest-client/")
+        return httpx.Response(202)
 
     runner = TrafficRunner(
-        "http://receiver.test", transport=httpx.MockTransport(record_kind)
+        "http://receiver.test", transport=httpx.MockTransport(record_path)
     )
     with TestClient(create_control_app(runner)) as client:
         apply(client, baseline_on=True)
         apply(client, load_on=True, rps=10, connections=1)
         time.sleep(0.2)
 
-    assert "baseline" in kinds
-    assert "load" in kinds
+    assert paths == {BASELINE_PATH, LOAD_PATH}

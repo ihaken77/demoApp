@@ -5,9 +5,12 @@ from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 
-# バックエンドが送信時に付ける種別のヘッダ。通常の通信（baseline）と負荷の通信（load）を分ける
-TRAFFIC_KIND_HEADER = "X-Traffic-Kind"
+# 通常の通信（テレメトリの定期送信）と負荷の通信（イベントの取り込み）の受け口。
+# 種別は経路で分ける（独自ヘッダを付けると、通常の API と違って見えるため）
+BASELINE_PATH = "/api/v1/telemetry/batches"
+LOAD_PATH = "/api/v1/ingest/events"
 KINDS = ("baseline", "load")
+KIND_BY_PATH = {BASELINE_PATH: KINDS[0], LOAD_PATH: KINDS[1]}
 # 種別が不明な受信は "other" にまとめる（合計には含める）
 OTHER_KIND = "other"
 # 集計する時間窓（秒）。短すぎると揺れ、長すぎると変化が遅れて見えるため 1 秒にする

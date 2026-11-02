@@ -9,14 +9,19 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from server.backend_client import BackendClient
 from server.config import load_backend_url
 from server.limits import CONNECTIONS_RANGE, MAX_INJECTED_MBPS, RPS_RANGE
 from server.state import LoadState
-from server.throughput import TRAFFIC_KIND_HEADER, ThroughputMeter
+from server.throughput import (
+    BASELINE_PATH,
+    KIND_BY_PATH,
+    LOAD_PATH,
+    ThroughputMeter,
+)
 
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
@@ -98,14 +103,20 @@ def create_app(backend: BackendClient, backend_name: str) -> FastAPI:
             state = candidate
         return {"state": asdict(state)}
 
-    @app.post("/receive", status_code=204)
-    async def receive(request: Request) -> Response:
-        # バックエンドからの通信を受けて捨てる（帯域を消費させるのが目的）。受けた分だけ実測に加える
-        kind = request.headers.get(TRAFFIC_KIND_HEADER, "")
+    async def ingest(request: Request, kind: str) -> Response:
+        # バックエンドからの通信を受け付けて捨てる（帯域を消費させるのが目的）。受けた分だけ実測に加える
         meter.record(kind, requests=1)
         async for chunk in request.stream():
             meter.record(kind, nbytes=len(chunk))
-        return Response(status_code=204)
+        return JSONResponse({"status": "accepted"}, status_code=202)
+
+    @app.post(BASELINE_PATH)
+    async def ingest_telemetry(request: Request) -> Response:
+        return await ingest(request, KIND_BY_PATH[BASELINE_PATH])
+
+    @app.post(LOAD_PATH)
+    async def ingest_events(request: Request) -> Response:
+        return await ingest(request, KIND_BY_PATH[LOAD_PATH])
 
     return app
 
