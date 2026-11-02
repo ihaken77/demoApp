@@ -68,7 +68,7 @@
     <section class="card">
       <div>
         <strong>実測の通信量</strong>
-        <div class="note" id="trafficNote">フロントが受信した量（直近 1 秒、HTTP の本文）</div>
+        <div class="note" id="trafficNote">フロントが受信した量と応答した量（直近 1 秒、HTTP の本文）</div>
       </div>
       <table class="traffic">
         <thead>
@@ -78,6 +78,7 @@
           <tr><td>通常の通信</td><td id="mbpsBaseline" class="value">-</td><td id="rpsBaseline">-</td></tr>
           <tr><td>負荷の通信</td><td id="mbpsLoad" class="value">-</td><td id="rpsLoad">-</td></tr>
           <tr class="total"><td>合計</td><td id="mbpsTotal" class="value">-</td><td id="rpsTotal">-</td></tr>
+          <tr><td>応答（フロント → バックエンド）</td><td id="mbpsReply" class="value">-</td><td id="rpsReply">-</td></tr>
         </tbody>
       </table>
     </section>
@@ -140,16 +141,16 @@
     $("connections").addEventListener("input", (e) => { $("connectionsValue").textContent = e.target.value; });
 
     // 実測の通信量を 1 秒ごとに取り直す。前の取得が終わってから次を予約し、要求が重ならないようにする
-    const TRAFFIC_ROWS = ["Baseline", "Load", "Total"];
+    const TRAFFIC_ROWS = ["Baseline", "Load", "Total", "Reply"];
     async function pollTraffic() {
       try {
         const res = await fetch("/api/traffic", { cache: "no-store" });
         const data = await res.json();
-        for (const [kind, suffix] of [["baseline", "Baseline"], ["load", "Load"], ["total", "Total"]]) {
+        for (const [kind, suffix] of [["baseline", "Baseline"], ["load", "Load"], ["total", "Total"], ["reply", "Reply"]]) {
           $(`mbps${suffix}`).textContent = data[kind].mbps.toFixed(1);
           $(`rps${suffix}`).textContent = data[kind].rps.toFixed(1);
         }
-        $("trafficNote").textContent = "フロントが受信した量（直近 1 秒、HTTP の本文）";
+        $("trafficNote").textContent = "フロントが受信した量と応答した量（直近 1 秒、HTTP の本文）";
       } catch {
         for (const suffix of TRAFFIC_ROWS) {
           $(`mbps${suffix}`).textContent = "-";

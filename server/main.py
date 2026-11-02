@@ -9,12 +9,13 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from server.backend_client import BackendClient
 from server.config import load_backend_url
 from server.limits import CONNECTIONS_RANGE, MAX_INJECTED_MBPS, RPS_RANGE
+from server.reply import ReplyBuilder
 from server.state import LoadState
 from server.throughput import (
     BASELINE_PATH,
@@ -43,6 +44,9 @@ def create_app(backend: BackendClient, backend_name: str) -> FastAPI:
     lock = asyncio.Lock()
     # 受信した通信量の実測（画面の表示用）
     meter = ThroughputMeter()
+    # 応答として返した通信量の実測（フロント → バックエンドの向き）
+    reply_meter = ThroughputMeter()
+    replies = ReplyBuilder()
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -70,7 +74,10 @@ def create_app(backend: BackendClient, backend_name: str) -> FastAPI:
     @app.get("/api/traffic")
     async def get_traffic() -> dict:
         # 直近 1 秒の受信量。画面は定期的に呼んで表示を更新する
-        return meter.snapshot()
+        data = meter.snapshot()
+        # 応答の向き（フロント → バックエンド）は合計だけを返す
+        data["reply"] = reply_meter.snapshot()["total"]
+        return data
 
     @app.post("/api/control")
     async def update_control(body: ControlUpdate) -> dict:
@@ -106,9 +113,14 @@ def create_app(backend: BackendClient, backend_name: str) -> FastAPI:
     async def ingest(request: Request, kind: str) -> Response:
         # バックエンドからの通信を受け付けて捨てる（帯域を消費させるのが目的）。受けた分だけ実測に加える
         meter.record(kind, requests=1)
+        received = 0
         async for chunk in request.stream():
             meter.record(kind, nbytes=len(chunk))
-        return JSONResponse({"status": "accepted"}, status_code=202)
+            received += len(chunk)
+        # 受信量の 1/5 程度の応答を返し、フロント → バックエンドの通信も発生させる
+        body = replies.build(received)
+        reply_meter.record(kind, nbytes=len(body), requests=1)
+        return Response(body, status_code=202, media_type="application/json")
 
     @app.post(BASELINE_PATH)
     async def ingest_telemetry(request: Request) -> Response:
